@@ -7,8 +7,8 @@ import jenkins
 import re
 import logging
 
-#token = '110821fb6940fe4501e8cdc63f22b62ad0'
-user = 'ismail.shahzad@datopian.com'
+#token = ''
+user = ''
 server_port = 'https://cc-p-jenkins.ckan.io'
 
 jenkins_key = config.get('ckan.ckan_cluster_jenkins_key')
