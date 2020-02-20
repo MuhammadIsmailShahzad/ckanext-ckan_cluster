@@ -7,19 +7,9 @@ import jenkins
 import re
 import logging
 
-#token = ''
-user = ''
-server_port = 'https://cc-p-jenkins.ckan.io'
-
-jenkins_key = config.get('ckan.ckan_cluster_jenkins_key')
-jenkins_key = str(jenkins_key)
-logging.error('******************************')
-logging.error(jenkins_key)
-
-logging.error('******************************')
-logging.error(config.get('ckan.harvest.mq.redis_db'))
-logging.error('*******************************')
-logging.error(config)
+user = config.get('ckan.jenkins_user')
+server_port = config.get('ckan.jenkins_server_port')
+jenkins_key = config.get('ckan.jenkins_token')
 
 @toolkit.side_effect_free
 def active_instances(context, data_dict):
@@ -31,7 +21,6 @@ def active_instances(context, data_dict):
     server = jenkins.Jenkins(server_port, username=user, 
                          password=jenkins_key)
     job_name = 'simplified list instances' 
-
 
     # Get the console output of the latest build of the job 
     info = server.get_job_info(job_name)
@@ -81,6 +70,4 @@ def active_instances(context, data_dict):
     )
 
     return active_instances
-
-
 
