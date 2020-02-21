@@ -23,4 +23,5 @@ class Ckan_ClusterPlugin(plugins.SingletonPlugin):
         '''
         return {
             'active_instances': actions.active_instances,
+            'update_gsheet':actions.update_gsheet
            }
