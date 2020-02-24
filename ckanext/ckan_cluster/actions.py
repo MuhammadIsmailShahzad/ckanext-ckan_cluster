@@ -22,6 +22,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_name('/srv/app/client_secret
 client = gspread.authorize(creds)
 sheet_key = config.get('ckan.gsheet_id')
 worksheet_id = config.get('ckan.gsheet_worksheet')
+sheet_name = config.get('ckan.gsheet_name')
 gsheet = client.open_by_key(sheet_key)
 sheet = gsheet.get_worksheet(int(worksheet_id))
 
@@ -83,9 +84,8 @@ def active_instances(context, data_dict):
             'instance_url':url_list
         }
     )
-
     return active_instances
-
+    
 @toolkit.side_effect_free
 def update_gsheet(context, data_dict):
     '''Writes the list of instances to a googlesheet 
@@ -93,24 +93,26 @@ def update_gsheet(context, data_dict):
     active_instances_obs = active_instances(context, data_dict) 
     
     sheet.clear()
-    row = 2
-    column = 1
-    request_count = 0
-    #limit for write request per 100 seconds
-    writeQuota = 80 
     header = ['id','config_repo','url_routes']
-    sheet.insert_row(header, 1) 
     write_row = []
+    new_list = []
+    new_list.append(header)
 
     for x in active_instances_obs:
-        if(request_count == writeQuota):
-            time.sleep(30)
-            request_count = 0
         write_row.append(str(x['id']))
         write_row.append(str(x['config_repo']))
         write_row.append(str(x['instance_url']).replace('u\'',' ').replace('\'',''))
-        sheet.insert_row(write_row, row)
-        row += 1
-        request_count += 1
+        new_list.append(write_row)
         write_row = []
+
+    gsheet.values_update(
+        sheet_name+'!A1',
+        params={
+            'valueInputOption': 'USER_ENTERED'
+        },
+        body={
+            'values': new_list
+        }
+    )
+ 
     return u'https://docs.google.com/spreadsheets/d/{}/edit#gid={}'.format(sheet_key, worksheet_id)
