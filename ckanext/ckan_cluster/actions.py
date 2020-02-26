@@ -121,9 +121,8 @@ def update_gsheet(context, data_dict):
     user_list = ckan.logic.get_action('user_list')(context, data_dict)
     
     user_name_list = [user['name'] for user in user_list]
-    
+
     if toolkit.c.user not in user_name_list:
-        return u'{}'.format(user_name_list)
         toolkit.abort(403, _('You are not authorized to access this list'))
 
     return u'https://docs.google.com/spreadsheets/d/{}/edit#gid={}'.format(sheet_key, worksheet_id)
