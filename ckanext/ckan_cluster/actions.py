@@ -3,6 +3,8 @@ from ckan import authz
 from pylons import config
 import ckan.plugins.toolkit as toolkit
 from ckan.common import _ 
+import ckan.logic
+import ckan.logic.action
 import jenkins
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -90,29 +92,39 @@ def active_instances(context, data_dict):
 def update_gsheet(context, data_dict):
     '''Writes the list of instances to a googlesheet 
     https://docs.google.com/spreadsheets/d/{sheet_key}/{worksheet_id}'''
-    active_instances_obs = active_instances(context, data_dict) 
     
-    sheet.clear()
-    header = ['id','config_repo','url_routes']
-    write_row = []
-    new_list = []
-    new_list.append(header)
-
-    for x in active_instances_obs:
-        write_row.append(str(x['id']))
-        write_row.append(str(x['config_repo']))
-        write_row.append(str(x['instance_url']).replace('u\'',' ').replace('\'',''))
-        new_list.append(write_row)
+    if authz.is_sysadmin(toolkit.c.user):
+        active_instances_obs = active_instances(context, data_dict) 
+    
+        sheet.clear()
+        header = ['id','config_repo','url_routes']
         write_row = []
+        new_list = []
+        new_list.append(header)
 
-    gsheet.values_update(
-        sheet_name+'!A1',
-        params={
-            'valueInputOption': 'USER_ENTERED'
-        },
-        body={
-            'values': new_list
-        }
-    )
- 
+        for x in active_instances_obs:
+            write_row.append(str(x['id']))
+            write_row.append(str(x['config_repo']))
+            write_row.append(str(x['instance_url']).replace('u\'',' ').replace('\'',''))
+            new_list.append(write_row)
+            write_row = []
+
+        gsheet.values_update(
+            sheet_name+'!A1',
+            params={
+                'valueInputOption': 'USER_ENTERED'
+            },
+            body={
+                'values': new_list
+            }
+        )
+    user_list = ckan.logic.get_action('user_list')(context, data_dict)
+    
+    user_name_list = []
+    for user in user_list:
+        user_name_list.append(user['name'])
+    
+    if toolkit.c.user not in user_name_list:
+        toolkit.abort(403, _('You are not authorized to access this list'))
+
     return u'https://docs.google.com/spreadsheets/d/{}/edit#gid={}'.format(sheet_key, worksheet_id)
