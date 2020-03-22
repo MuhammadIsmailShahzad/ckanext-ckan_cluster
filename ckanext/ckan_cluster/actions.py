@@ -1,8 +1,7 @@
 import ckan.plugins as plugins
 from ckan import authz
-from pylons import config
 import ckan.plugins.toolkit as toolkit
-from ckan.common import _ 
+from ckan.common import _
 import ckan.logic
 import ckan.logic.action
 import jenkins
@@ -11,10 +10,15 @@ from oauth2client.service_account import ServiceAccountCredentials
 import re
 import logging
 import time
+import csv
+from ckan.common import config
 
 user = config.get('ckan.jenkins_user')
 server_port = config.get('ckan.jenkins_server_port')
 jenkins_key = config.get('ckan.jenkins_token')
+
+
+logging.error(config)
 
 # use creds to create a client to interact with the Google Drive API 
 scope = ['https://spreadsheets.google.com/feeds',
@@ -27,12 +31,13 @@ worksheet_id = config.get('ckan.gsheet_worksheet')
 sheet_name = config.get('ckan.gsheet_name')
 gsheet = client.open_by_key(sheet_key)
 sheet = gsheet.get_worksheet(int(worksheet_id))
-
+logging.error('GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG')
+logging.error(sheet_name)
 
 @toolkit.side_effect_free
 def active_instances(context, data_dict):
     '''Returns a list of active instances of ckan'''
-
+    
     if not authz.is_sysadmin(toolkit.c.user):
         toolkit.abort(403, _('You are not authorized to access this list'))
     
@@ -43,7 +48,7 @@ def active_instances(context, data_dict):
     # Get the console output of the latest build of the job 
     info = server.get_job_info(job_name)
     builds = info['builds']
-    number = int(builds[-1]['number'])
+    number = int(builds[0]['number'])
     console_output = server.get_build_console_output(job_name, number)
     
     data_split = console_output.split('\n')
@@ -73,9 +78,9 @@ def active_instances(context, data_dict):
                      })
                 url_list = []
         if git_repo:
-            repo = 'https://'+ git_repo.group(1)
+            repo = 'https://{}'.format(git_repo.group(1))
         if url:
-            route = 'https://'+ url.group(1)
+            route = 'https://{}'.format(url.group(1))
             url_list.append(route)
             instance_id_data = instance_rep
     
@@ -87,9 +92,11 @@ def active_instances(context, data_dict):
         }
     )
     return active_instances
-    
+
+
 @toolkit.side_effect_free
 def update_gsheet(context, data_dict):
+
     '''Writes the list of instances to a googlesheet 
     https://docs.google.com/spreadsheets/d/{sheet_key}/{worksheet_id}'''
     
@@ -97,18 +104,33 @@ def update_gsheet(context, data_dict):
         active_instances_obs = active_instances(context, data_dict) 
     
         sheet.clear()
-        header = ['id','config_repo','url_routes']
+        #header = ['id','config_repo','url_routes']
         write_row = []
         new_list = []
-        new_list.append(header)
+        prev_count = 0
+        #new_list.append(header)
 
         for x in active_instances_obs:
+            
             write_row.append(str(x['id']))
             write_row.append(str(x['config_repo']))
-            write_row.append(str(x['instance_url']).replace('u\'',' ').replace('\'',''))
+
+            count = 0
+            
+            for url in x['instance_url']:
+                
+                write_row.append(str(url))
+                count += 1
+
+                if count > prev_count:
+                    prev_count = count
+
             new_list.append(write_row)
             write_row = []
-
+        
+        header = ['id','config_repo'] + [u'route no. {0}'.format(i) for i in range(1,prev_count+1)]
+        new_list.insert(0,header)        
+        
         gsheet.values_update(
             sheet_name+'!A1',
             params={
@@ -118,11 +140,58 @@ def update_gsheet(context, data_dict):
                 'values': new_list
             }
         )
+    csv_file = create_dataset_csv(active_instances_obs)
     user_list = ckan.logic.get_action('user_list')(context, data_dict)
     
     user_name_list = [user['name'] for user in user_list]
 
     if toolkit.c.user not in user_name_list:
         toolkit.abort(403, _('You are not authorized to access this list'))
+    
+    dataset_id = 'list-instances-dataset'
+    owner_org_id = 'operations'
+    resource_id = 'active-instances.csv'
+    dataset_id_2 = 'list-instances-dataset-four'
+    dataset_id_5 = 'list-instances-dataset-feive'
+    resource_url = 'https://raw.githubusercontent.com/MuhammadIsmailShahzad/telecom-operators-of-the-world/master/telecom-operators.csv'
 
-    return u'https://docs.google.com/spreadsheets/d/{}/edit#gid={}'.format(sheet_key, worksheet_id)
+    not_found_error = ckan.logic.NotFound
+     
+    try:
+        result = toolkit.get_action('package_show')(context, {'id': dataset_id})
+    
+    except(not_found_error):
+    
+        result = toolkit.get_action('package_create')(context, {'name': dataset_id,'owner_org': owner_org_id })
+    result2 = []      
+    if resource_id not in result['resources']:
+        #if resource == resource_id:
+        #    result2 = resource['name']
+        #else:
+        result2 = u'Please create a resource'
+        result2 = toolkit.get_action('resource_create')(context, {'package_id':dataset_id,'upload': csv_file})
+        #break
+    
+    try:
+        result1 = toolkit.get_action('resource_show')(context, {'id': resource_id})
+    except:
+        result1 = u'sorry'
+    #toolkit.get_action('resource_view_create')(context, {'resource_id':resource_id})
+
+    return csv_file
+
+
+    #return u'https://docs.google.com/spreadsheets/d/{}/edit#gid={}'.format(sheet_key, worksheet_id)
+
+def create_dataset_csv(active_instances_obs):
+    csv_columns = ['id','config_repo','instance_url']
+    csv_file = '{}/{}'.format(config.get('ckan.storage_path'),'active-instances.csv')
+    try:
+        with open(csv_file, 'w') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
+            writer.writeheader()
+            for data in active_instances_obs:
+                writer.writerow(data)
+    except IOError:
+        print("I/O error")
+    return csv_file 
