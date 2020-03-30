@@ -112,9 +112,6 @@ def update_gsheet(context, data_dict):
         data_list = []
         prev_count = 0
         
-        max_instances_list = max(active_instances_obs, key = lambda i: len(i)) 
-        max_routes_length = len(max_instances_list)
-    
         for x in active_instances_obs:
 
             write_row.append(str(x['id']))
@@ -210,8 +207,6 @@ def upload_file(csv_file, action, resource_id):
                 toolkit.get_action('resource_create')(context, 
                 {'package_id':dataset_id,'url':'active instances', 
                 'upload': upload,'name':'active_instances.csv'})
-                logging.error('CREATE')
             else:
                 toolkit.get_action('resource_update')(context, 
                 {'id':resource_id,'upload':upload})
-                logging.error('UPDATE')
