@@ -12,11 +12,13 @@ import logging
 import time
 import csv
 from ckan.common import config
+import cgi
+
 
 user = config.get('ckan.jenkins_user')
 server_port = config.get('ckan.jenkins_server_port')
 jenkins_key = config.get('ckan.jenkins_token')
-
+not_found_error = ckan.logic.NotFound
 
 # use creds to create a client to interact with the Google Drive API
 scope = ['https://spreadsheets.google.com/feeds',
@@ -27,9 +29,11 @@ client = gspread.authorize(creds)
 sheet_key = config.get('ckan.gsheet_id')
 worksheet_id = config.get('ckan.gsheet_worksheet')
 sheet_name = config.get('ckan.gsheet_name')
+dataset_id = config.get('ckan.dataset_id')
+owner_org_id = config.get('ckan.owner_org_id')
+resource_name = config.get('ckan.resource_name')
 gsheet = client.open_by_key(sheet_key)
 sheet = gsheet.get_worksheet(int(worksheet_id))
-
 
 @toolkit.side_effect_free
 def active_instances(context, data_dict):
@@ -94,7 +98,6 @@ def active_instances(context, data_dict):
     )
     return active_instances
 
-
 @toolkit.side_effect_free
 def update_gsheet(context, data_dict):
 
@@ -105,12 +108,13 @@ def update_gsheet(context, data_dict):
         active_instances_obs = active_instances(context, data_dict)
 
         sheet.clear()
-        #header = ['id','config_repo','url_routes']
         write_row = []
-        new_list = []
+        data_list = []
         prev_count = 0
-        #new_list.append(header)
-
+        
+        max_instances_list = max(active_instances_obs, key = lambda i: len(i)) 
+        max_routes_length = len(max_instances_list)
+    
         for x in active_instances_obs:
 
             write_row.append(str(x['id']))
@@ -126,11 +130,11 @@ def update_gsheet(context, data_dict):
                 if count > prev_count:
                     prev_count = count
 
-            new_list.append(write_row)
+            data_list.append(write_row)
             write_row = []
 
         header = ['id','config_repo'] + [u'route no. {0}'.format(i) for i in range(1,prev_count+1)]
-        new_list.insert(0,header)
+        data_list.insert(0,header)
 
         gsheet.values_update(
             sheet_name+'!A1',
@@ -138,61 +142,76 @@ def update_gsheet(context, data_dict):
                 'valueInputOption': 'USER_ENTERED'
             },
             body={
-                'values': new_list
+                'values': data_list
             }
         )
-    csv_file = create_dataset_csv(active_instances_obs)
+    
+    csv_file = create_dataset_csv(data_list)
+    
     user_list = ckan.logic.get_action('user_list')(context, data_dict)
-
     user_name_list = [user['name'] for user in user_list]
 
     if toolkit.c.user not in user_name_list:
         toolkit.abort(403, _('You are not authorized to access this list'))
 
-    dataset_id = 'list-instances-dataset'
-    owner_org_id = 'operations'
-    resource_id = 'active-instances.csv'
-    dataset_id_2 = 'list-instances-dataset-four'
-    dataset_id_5 = 'list-instances-dataset-feive'
-    resource_url = 'https://raw.githubusercontent.com/MuhammadIsmailShahzad/telecom-operators-of-the-world/master/telecom-operators.csv'
-
-    not_found_error = ckan.logic.NotFound
-
     try:
         result = toolkit.get_action('package_show')(context, {'id': dataset_id})
 
     except(not_found_error):
+        result = toolkit.get_action('package_create')(context, 
+        {'name': dataset_id,'owner_org': owner_org_id })
+        logging.error('EXCEPT')
 
-        result = toolkit.get_action('package_create')(context, {'name': dataset_id,'owner_org': owner_org_id })
-    result2 = []
-    if resource_id not in result['resources']:
-        #if resource == resource_id:
-        #    result2 = resource['name']
-        #else:
-        result2 = u'Please create a resource'
-        result2 = toolkit.get_action('resource_create')(context, {'package_id':dataset_id,'upload': csv_file})
-        #break
-
-    try:
-        result1 = toolkit.get_action('resource_show')(context, {'id': resource_id})
-    except:
-        result1 = u'sorry'
-    #toolkit.get_action('resource_view_create')(context, {'resource_id':resource_id})
-
-    return csv_file
-
-
-    #return u'https://docs.google.com/spreadsheets/d/{}/edit#gid={}'.format(sheet_key, worksheet_id)
+    # If the resource is not found in the dataset create one
+    if not any(d['name'] == resource_name for d in result['resources']):
+        logging.info('Created new resource')
+        upload_file(csv_file, u'create', None)
+        
+    # Update existing resource    
+    else:
+        for resource in result['resources']:
+            if resource['name'] == resource_name:
+                resource_id = resource['id']
+                break
+        logging.error('Please update {}'.format(resource_id))
+        upload_file(csv_file, u'update',resource_id)
+        
+        logging.info('Updating the resource')
+    
+    return u'https://docs.google.com/spreadsheets/d/{}/edit#gid={}'.format(sheet_key, worksheet_id)
 
 def create_dataset_csv(active_instances_obs):
-    csv_columns = ['id','config_repo','instance_url']
-    csv_file = '{}/{}'.format(config.get('ckan.storage_path'),'active-instances.csv')
+    
+    maxList = max(active_instances_obs, key = lambda i: len(i)) 
+    maxLength = len(maxList)
+    
+    csv_columns = ['id','config_repo'] + ['route no. {0}'.format(i) for i in range(1,maxLength-1)]
+    csv_file = '{}/{}'.format(config.get('ckan.storage_path'),'upload.csv')
+
     try:
         with open(csv_file, 'w') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
-            writer.writeheader()
-            for data in active_instances_obs:
-                writer.writerow(data)
+            writer = csv.writer(csvfile)
+            writer.writerows(active_instances_obs)
+
     except IOError:
         print("I/O error")
     return csv_file
+
+def upload_file(csv_file, action, resource_id):
+       context = {
+           'ignore_auth': True,
+           'user': '',
+       }
+       with open(csv_file, 'rb') as csv_file:
+            upload = cgi.FieldStorage()
+            upload.filename = getattr(csv_file, 'name', 'data')
+            upload.file = csv_file
+            if action == u'create': 
+                toolkit.get_action('resource_create')(context, 
+                {'package_id':dataset_id,'url':'active instances', 
+                'upload': upload,'name':'active_instances.csv'})
+                logging.error('CREATE')
+            else:
+                toolkit.get_action('resource_update')(context, 
+                {'id':resource_id,'upload':upload})
+                logging.error('UPDATE')
