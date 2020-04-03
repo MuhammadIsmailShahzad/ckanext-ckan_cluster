@@ -14,7 +14,6 @@ import csv
 from ckan.common import config
 import cgi
 
-
 user = config.get('ckan.jenkins_user')
 server_port = config.get('ckan.jenkins_server_port')
 jenkins_key = config.get('ckan.jenkins_token')
@@ -55,54 +54,68 @@ def active_instances(context, data_dict):
     data_split = console_output.split('\n')
 
     url_list = []
+    all_instances = []
     active_instances = []
+    config_repo = None
+    instance_id = None
 
     # Go through the data line by line and search for id,repo and routes
     # and append them in active_instances
     for line in data_split:
+
         line = line.strip()
-        instance_id = re.search('== (.*)', line)
-        git_repo = (re.search('imageFromGitlab: (.*)',line) or
-        re.search('registry.(.*)', line))
-
-        if (re.search('registry.(.*)@', line)):
-            git_repo = re.search('registry.(.*)@', line)
-
-        url = None
-
+        # All the instance_ids start with '=='
+        if line.startswith('== '):
+            if instance_id:
+                if config_repo != 'null':
+                    repo = 'https://{}'.format(config_repo.group(1))
+                else:
+                    repo = 'null'
+                all_instances.append({
+                        'id': instance_id.group(1),
+                        'config_repo':repo,
+                        'instance_url':url_list
+                        })
+                config_repo = 'null'
+                url_list = []
+            
+            instance_id = re.search('== (.*)', line)
+            instance = instance_id.group(1)
+        
+        # Lines starting with 'image' contain the config_repo
+        if line.startswith('image'):
+            config_repo = (re.search('imageFromGitlab: (.*)',line) or
+            re.search('registry.(.*)', line))
+            if (re.search('registry.(.*)@', line)):
+                config_repo = re.search('registry.(.*)@', line)
+        
+        # Lines starting with '-' contain the url_routes
         if line.startswith('-'):
             url = re.search('- (.*)', line)
-
-        if instance_id:
-            instance_rep = instance_id.group(1)
-            if url_list:
-                active_instances.append({
-                    'id': instance_id_data,
-                    'config_repo':repo,
-                    'instance_url':url_list
-                     })
-                url_list = []
-        if git_repo:
-            repo = 'https://{}'.format(git_repo.group(1))
-        if url:
             route = 'https://{}'.format(url.group(1))
             url_list.append(route)
-            instance_id_data = instance_rep
-
-    active_instances.append(
-        {
-            'id':instance_id_data,
-            'config_repo':repo,
-            'instance_url':url_list
-        }
-    )
+    
+    # To get the last entry of the instance list
+    all_instances.append({
+                        'id': instance,
+                        'config_repo':repo,
+                        'instance_url':url_list
+                         })
+    
+    # Remove instances that don't have any active route
+    for instances in all_instances:
+        if instances['instance_url']:
+            active_instances.append(instances)
+    
     return active_instances
 
 @toolkit.side_effect_free
 def update_gsheet(context, data_dict):
 
     '''Writes the list of instances to a googlesheet
-    https://docs.google.com/spreadsheets/d/{sheet_key}/{worksheet_id}'''
+    https://docs.google.com/spreadsheets/d/{sheet_key}/{worksheet_id}
+    Also adds a csv of the active instances to a dataset of the running instance
+    '''
 
     if authz.is_sysadmin(toolkit.c.user):
         active_instances_obs = active_instances(context, data_dict)
@@ -143,38 +156,35 @@ def update_gsheet(context, data_dict):
             }
         )
     
-    csv_file = create_dataset_csv(data_list)
+        csv_file = create_dataset_csv(data_list)
     
+        try:
+            result = toolkit.get_action('package_show')(context, {'id': dataset_id})
+
+        except(not_found_error):
+            result = toolkit.get_action('package_create')(context, 
+            {'name': dataset_id,'owner_org': owner_org_id })
+
+        # If the resource is not found in the dataset create one
+        if not any(d['name'] == resource_name for d in result['resources']):
+            logging.info('Created new resource')
+            upload_file(csv_file, u'create', None)
+        
+        # Update existing resource    
+        else:
+            for resource in result['resources']:
+                if resource['name'] == resource_name:
+                    resource_id = resource['id']
+                    break
+            upload_file(csv_file, u'update',resource_id)
+        
+            logging.info('Updating the resource')
+
     user_list = ckan.logic.get_action('user_list')(context, data_dict)
     user_name_list = [user['name'] for user in user_list]
-
     if toolkit.c.user not in user_name_list:
         toolkit.abort(403, _('You are not authorized to access this list'))
 
-    try:
-        result = toolkit.get_action('package_show')(context, {'id': dataset_id})
-
-    except(not_found_error):
-        result = toolkit.get_action('package_create')(context, 
-        {'name': dataset_id,'owner_org': owner_org_id })
-        logging.error('EXCEPT')
-
-    # If the resource is not found in the dataset create one
-    if not any(d['name'] == resource_name for d in result['resources']):
-        logging.info('Created new resource')
-        upload_file(csv_file, u'create', None)
-        
-    # Update existing resource    
-    else:
-        for resource in result['resources']:
-            if resource['name'] == resource_name:
-                resource_id = resource['id']
-                break
-        logging.error('Please update {}'.format(resource_id))
-        upload_file(csv_file, u'update',resource_id)
-        
-        logging.info('Updating the resource')
-    
     return u'https://docs.google.com/spreadsheets/d/{}/edit#gid={}'.format(sheet_key, worksheet_id)
 
 def create_dataset_csv(active_instances_obs):
@@ -191,7 +201,7 @@ def create_dataset_csv(active_instances_obs):
             writer.writerows(active_instances_obs)
 
     except IOError:
-        print("I/O error")
+        logging.error("I/O error")
     return csv_file
 
 def upload_file(csv_file, action, resource_id):
