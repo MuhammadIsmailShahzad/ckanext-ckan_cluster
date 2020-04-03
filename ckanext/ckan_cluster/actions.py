@@ -110,8 +110,7 @@ def active_instances(context, data_dict):
     return active_instances
 
 @toolkit.side_effect_free
-def update_gsheet(context, data_dict):
-
+def update_instance_list(context, data_dict):
     '''Writes the list of instances to a googlesheet
     https://docs.google.com/spreadsheets/d/{sheet_key}/{worksheet_id}
     Also adds a csv of the active instances to a dataset of the running instance

@@ -9,7 +9,7 @@ class Ckan_ClusterPlugin(plugins.SingletonPlugin):
 
     # IConfigurer
     # NEW
-
+    
     def update_config(self, config_):
         toolkit.add_template_directory(config_, 'templates')
         toolkit.add_public_directory(config_, 'public')
@@ -23,5 +23,5 @@ class Ckan_ClusterPlugin(plugins.SingletonPlugin):
         '''
         return {
             'active_instances': actions.active_instances,
-            'update_gsheet':actions.update_gsheet
+            'update_instance_list':actions.update_instance_list
            }
