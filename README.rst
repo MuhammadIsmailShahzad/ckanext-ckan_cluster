@@ -32,19 +32,19 @@
 ckanext-ckan_cluster
 =============
 
-.. Put a description of your extension here:
-   What does it do? What features does it have?
-   Consider including some screenshots or embedding a video!
-
+This extension fetches the list of active instances along with their config-repos and routes
+from jenkins and writes the data to a csv which is then pushed as a resource to a dataset.
 
 ------------
 Requirements
 ------------
 
-For example, you might want to mention here which versions of CKAN this
-extension works with.
-
-
+The extension has following requirements
+```
+python-jenkins==1.6.0
+gspread==3.2.0
+oauth2client==4.1.3
+```
 ------------
 Installation
 ------------
@@ -76,11 +76,37 @@ To install ckanext-ckan_cluster:
 Config Settings
 ---------------
 
-Document any optional config settings here. For example::
+Following config settigs should be set up while running the extension
 
-    # The minimum number of hours to wait before re-checking a resource
-    # (optional, default: 24).
-    ckanext.ckan_cluster.some_setting = some_default_value
+* Jenkins setup::
+   
+    # The endpoint you are using for your jenkins server
+    ckan.jenkins_server_port = some_url 
+    # API Token in the configure setting of your jenkins account 
+    ckan.jenkins_token = some_token_value
+    # The email you use for jenkins
+    ckan.jenkins_user = some_email
+    
+    # The organization you want to be used for uploading the dataset
+    ckan.owner_org_id = operations
+    # The name you want the resource to have when its created
+    ckan.dataset_id = list-instances-dataset
+    # The name you want the resource to have when its uploaded
+    ckan.resource_name = active_instances.csv
+* Google Sheets Setup
+  * Go to the site https://console.developers.google.com/
+  *  Login to your google account.
+  * Create new project and enable Google Sheets API and Google Drive API.
+  * Get the credentials.json file.
+  * Rename the credential.json file to `client_secret.json` and COPY it to 
+  `/srv/app/client_secret.json` in the Dockerfile 
+  * Set following config settings::  
+    # The id of the sheet you want to update
+    ckan.gsheet_id = some_id
+    # Worksheet id eg 0
+    ckan.gsheet_worksheet = 0
+    # Sheet name eg Sheet1
+    ckan.gsheet_name = Sheet1
 
 
 ------------------------
