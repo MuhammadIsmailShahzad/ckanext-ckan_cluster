@@ -142,7 +142,7 @@ def update_instance_list(context, data_dict):
             data_list.append(write_row)
             write_row = []
 
-        header = ['id','config_repo'] + [u'route no. {0}'.format(i) for i in range(1,prev_count+1)]
+        header = ['Instance ID','Config Repository'] + [u'Website URL {0}'.format(i) for i in range(1,prev_count+1)]
         data_list.insert(0,header)
 
         gsheet.values_update(
@@ -191,7 +191,7 @@ def create_dataset_csv(active_instances_obs):
     maxList = max(active_instances_obs, key = lambda i: len(i)) 
     maxLength = len(maxList)
     
-    csv_columns = ['id','config_repo'] + ['route no. {0}'.format(i) for i in range(1,maxLength-1)]
+    csv_columns = ['Instance ID','Config Repository'] + ['Website URL {0}'.format(i) for i in range(1,maxLength-1)]
     csv_file = '{}/{}'.format(config.get('ckan.storage_path'),'upload.csv')
 
     try:
