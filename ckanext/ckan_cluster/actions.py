@@ -192,7 +192,8 @@ def create_dataset_csv(active_instances_obs):
     maxLength = len(maxList)
     
     csv_columns = ['Instance ID','Config Repository'] + ['Website URL {0}'.format(i) for i in range(1,maxLength-1)]
-    csv_file = '{}/{}'.format(config.get('ckan.storage_path'),'upload.csv')
+    #csv_file = '{}/{}'.format(config.get('ckan.storage_path'),'upload.csv')
+    csv_file = '{0}/{1}'.format('/srv/app/','upload.csv')
 
     try:
         with open(csv_file, 'w') as csvfile:
