@@ -8,7 +8,7 @@ import jenkins
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import re
-import logging
+#import logging
 import time
 import csv
 from ckan.common import config
@@ -166,7 +166,7 @@ def update_instance_list(context, data_dict):
 
         # If the resource is not found in the dataset create one
         if not any(d['name'] == resource_name for d in result['resources']):
-            logging.info('Created new resource')
+            #logging.info('Created new resource')
             upload_file(csv_file, u'create', None)
         
         # Update existing resource    
@@ -177,7 +177,7 @@ def update_instance_list(context, data_dict):
                     break
             upload_file(csv_file, u'update',resource_id)
         
-            logging.info('Updating the resource')
+            #logging.info('Updating the resource')
 
     user_list = ckan.logic.get_action('user_list')(context, data_dict)
     user_name_list = [user['name'] for user in user_list]
@@ -201,7 +201,8 @@ def create_dataset_csv(active_instances_obs):
             writer.writerows(active_instances_obs)
 
     except IOError:
-        logging.error("I/O error")
+        print("I/O error")
+        #logging.error("I/O error")
     return csv_file
 
 def upload_file(csv_file, action, resource_id):
