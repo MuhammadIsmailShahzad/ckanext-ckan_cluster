@@ -8,11 +8,13 @@ import jenkins
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import re
-#import logging
+import logging
 import time
 import csv
 from ckan.common import config
 import cgi
+
+log = logging.getLogger(__name__)
 
 user = config.get('ckan.jenkins_user')
 server_port = config.get('ckan.jenkins_server_port')
