@@ -36,9 +36,9 @@ This extension fetches the list of active instances along with their config-repo
 from jenkins and writes the data to a csv which is then pushed as a resource to a dataset.
 
 * It has two two action endpoints
-    * /api/actions/active_instances
+    * /api/action/active_instances
         * Returns a list of active instances along with their config-repo and url-routes
-    * /api/actions/update_instance_list
+    * /api/action/update_instance_list
         * Writes the active-instances to gsheet
         * Looks for an organization with organization_name(configurable)
         * If not present prompts with a message that organization not found
