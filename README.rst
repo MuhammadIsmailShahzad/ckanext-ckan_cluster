@@ -88,14 +88,19 @@ Config Settings
 Following config settigs should be set up while running the extension
 
 * Jenkins setup
-    * Set followind config settings for jenkins::   
+    * Login to your Jenkins serveer
+    * Click on your name on the top right corner
+    * Go to configure
+    * Click on "Add new Token"
+    * Copy the token
+    * Set following config settings for jenkins::   
       
         # The endpoint you are using for your jenkins server
-        ckan.jenkins_server_port = some_url 
+        ckan.jenkins_server_port = some_url (Your jenkins domain name e.g. https://myjenkinsserver.com)
         # API Token in the configure setting of your jenkins account 
-        ckan.jenkins_token = some_token_value
+        ckan.jenkins_token = some_token_value (The token generated)
         # The email you use for jenkins
-        ckan.jenkins_user = some_email
+        ckan.jenkins_user = some_email (The email with which the token is generated)
 * Org and Dataset name
     * Set organization name and dataset name by using these variables:: 
       
