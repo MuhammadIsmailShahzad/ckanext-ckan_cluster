@@ -33,7 +33,8 @@ ckanext-ckan_cluster
 =============
 
 This extension fetches the list of active instances along with their config-repos and routes
-from jenkins and writes the data to a csv which is then pushed as a resource to a dataset.
+from jenkins and writes the data to a csv which is then pushed as a resource to a dataset 
+and also updates the data in the gsheet.
 
 * It has two two action endpoints
     * /api/action/active_instances
